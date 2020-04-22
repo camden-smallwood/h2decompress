@@ -4,7 +4,7 @@ use std::{env, fs::File, io::{self, Read, Seek, SeekFrom, Write}, mem, slice};
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 struct CompressedSection {
     pub size: i32,
-    pub offset: u32
+    pub offset: i32
 }
 
 fn unpack(input_file: &mut File, output_file: &mut File) -> io::Result<()> {
@@ -71,12 +71,14 @@ fn pack(input_file: &mut File, output_file: &mut File, should_compress: bool) ->
             break;
         }
         
-        section.offset = data.len() as u32;
+        section.offset = data.len() as i32;
         
         if should_compress {
-            let compressed_data = deflate::deflate_bytes_zlib_conf(&section_data[..len], deflate::Compression::Fast);
+            let compressed_data = deflate::deflate_bytes_zlib_conf(&section_data[..len], deflate::CompressionOptions::default().with_window_bits(10));
             data.extend_from_slice(&compressed_data[..]);
             section.size = compressed_data.len() as i32;
+            let padding = ((section.offset + section.size + 0x79) & (!0x79)) - (section.offset + section.size);
+            data.extend(vec![0u8; padding as usize]);
         } else {
             data.extend_from_slice(&section_data[..len]);
             section.size = -(len as i32);
@@ -93,7 +95,7 @@ fn pack(input_file: &mut File, output_file: &mut File, should_compress: bool) ->
 }
 
 fn print_usage() {
-    println!("Usage: <decompress|pack> <input> <output>");
+    println!("Usage: <decompress|compress|pack> <input> <output>");
     std::process::exit(-1);
 }
 
@@ -109,6 +111,8 @@ fn main() -> io::Result<()> {
     
     if args[1].starts_with('d') {
         unpack(&mut input_file, &mut output_file)
+    } else if args[1].starts_with('c') {
+        pack(&mut input_file, &mut output_file, true)
     } else if args[1].starts_with('p') {
         pack(&mut input_file, &mut output_file, false)
     } else {

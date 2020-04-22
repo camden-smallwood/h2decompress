@@ -5,5 +5,5 @@ authors = ["Camden Smallwood <camden.smallwood@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-deflate = "*"
+deflate = { git = "https://github.com/camden-smallwood/deflate-rs.git", branch = "dev" }
 inflate = "*"

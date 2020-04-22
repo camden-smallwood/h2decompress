@@ -1,5 +1,25 @@
 use std::{env, fs::File, io::{self, Read, Seek, SeekFrom, Write}, mem, slice};
 
+fn main() -> io::Result<()> {
+    let mut args: Vec<String> = env::args().collect();
+    args.remove(0);
+
+    match args.len() {
+        3 => match args[0].as_str() {
+            "decompress" | "d" => unpack(args[1].clone(), args[2].clone()),
+            "compress" | "c" => pack(args[1].clone(), args[2].clone(), true),
+            "pack" | "p" => pack(args[1].clone(), args[2].clone(), true),
+            _ => usage()
+        },
+
+        _ => usage()
+    }
+}
+
+fn usage() -> io::Result<()> {
+    Err(io::Error::new(io::ErrorKind::InvalidInput, "Usage: <decompress|compress|pack> <input> <output>"))
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 struct CompressedSection {
@@ -7,8 +27,11 @@ struct CompressedSection {
     pub offset: i32
 }
 
-fn unpack(input_file: &mut File, output_file: &mut File) -> io::Result<()> {
+fn unpack(input_path: String, output_path: String) -> io::Result<()> {
     let mut data = vec![0u8; 0x1000];
+    
+    let mut input_file = File::open(input_path)?;
+    let mut output_file = File::create(output_path)?;
 
     input_file.seek(SeekFrom::Start(0))?;
     input_file.read_exact(&mut data[..])?;
@@ -53,12 +76,12 @@ fn unpack(input_file: &mut File, output_file: &mut File) -> io::Result<()> {
     output_file.write_all(&data[..])
 }
 
-fn pack(input_file: &mut File, output_file: &mut File, should_compress: bool) -> io::Result<()> {
+fn pack(input_path: String, output_path: String, should_compress: bool) -> io::Result<()> {
     let mut data = vec![0u8; 0x1000];
-
-    input_file.seek(SeekFrom::Start(0))?;
-    input_file.read_exact(&mut data[..])?;
     
+    let mut input_file = File::open(input_path)?;
+    let mut output_file = File::create(output_path)?;
+
     data.resize(0x3000, 0);
 
     let mut sections = [CompressedSection { size: 0, offset: 0 }; 1024];
@@ -74,7 +97,7 @@ fn pack(input_file: &mut File, output_file: &mut File, should_compress: bool) ->
         section.offset = data.len() as i32;
         
         if should_compress {
-            let compressed_data = deflate::deflate_bytes_zlib_conf(&section_data[..len], deflate::CompressionOptions::default().with_window_bits(10));
+            let compressed_data = deflate::deflate_bytes_zlib_conf(&section_data[..len], deflate::CompressionOptions::fast().with_window_bits(10));
             data.extend_from_slice(&compressed_data[..]);
             section.size = compressed_data.len() as i32;
             let padding = ((section.offset + section.size + 0x79) & (!0x79)) - (section.offset + section.size);
@@ -92,30 +115,4 @@ fn pack(input_file: &mut File, output_file: &mut File, should_compress: bool) ->
     output_file.write_all(&data[..])?;
     
     Ok(())
-}
-
-fn print_usage() {
-    println!("Usage: <decompress|compress|pack> <input> <output>");
-    std::process::exit(-1);
-}
-
-fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 4 {
-        print_usage();
-    }
-
-    let mut input_file = File::open(args[2].clone())?;
-    let mut output_file = File::create(args[3].clone())?;
-    
-    if args[1].starts_with('d') {
-        unpack(&mut input_file, &mut output_file)
-    } else if args[1].starts_with('c') {
-        pack(&mut input_file, &mut output_file, true)
-    } else if args[1].starts_with('p') {
-        pack(&mut input_file, &mut output_file, false)
-    } else {
-        Ok(print_usage())
-    }
 }

@@ -82,6 +82,9 @@ fn pack(input_path: String, output_path: String, should_compress: bool) -> io::R
     let mut input_file = File::open(input_path)?;
     let mut output_file = File::create(output_path)?;
 
+    input_file.seek(SeekFrom::Start(0))?;
+    input_file.read_exact(&mut data[..])?;
+
     data.resize(0x3000, 0);
 
     let mut sections = [CompressedSection { size: 0, offset: 0 }; 1024];

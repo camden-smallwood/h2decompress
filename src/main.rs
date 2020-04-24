@@ -8,7 +8,7 @@ fn main() -> io::Result<()> {
         3 => match args[0].as_str() {
             "decompress" | "d" => unpack(args[1].clone(), args[2].clone()),
             "compress" | "c" => pack(args[1].clone(), args[2].clone(), true),
-            "pack" | "p" => pack(args[1].clone(), args[2].clone(), true),
+            "pack" | "p" => pack(args[1].clone(), args[2].clone(), false),
             _ => usage()
         },
 
